@@ -25,6 +25,8 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let image = info[.editedImage] as? UIImage else { return }
         
+        
+        
         //creates a unique name string for the image name and appends to image
         let imageName = UUID().uuidString
         let imagePath = getDocumentsDirectory().appendingPathComponent(imageName)
@@ -43,8 +45,16 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         dismiss(animated: true)
     }
     
+    // Create image picker
     @objc func addNewPerson() {
         let picker = UIImagePickerController()
+        
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+        } else {
+            picker.sourceType = .photoLibrary
+        }
+        
         picker.allowsEditing = true
         picker.delegate = self
         present(picker, animated: true)
