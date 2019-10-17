@@ -16,6 +16,18 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         super.viewDidLoad()
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewPerson))
 
+        //Load saved data from UD
+        let defaults = UserDefaults.standard
+        
+        if let savedPeople = defaults.object(forKey: "people") as? Data {
+            let jsonDecoder = JSONDecoder()
+            
+            do {
+                people = try jsonDecoder.decode([Person].self, from: savedPeople)
+            } catch {
+                print("Could not decode")
+            }
+        }
     }
 
 
@@ -39,6 +51,7 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         // create new person
         let person = Person(name: "Unknown", image: imageName)
         people.append(person)
+        save()
         collectionView.reloadData()
         
         //Dismisses the top-most view controller
@@ -69,6 +82,17 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         return path[0]
     }
 
+    
+    func save() {
+        let jsonEncoder = JSONEncoder()
+        
+        if let savedData = try? jsonEncoder.encode(people) {
+            let defaults = UserDefaults.standard
+            defaults.set(savedData, forKey: "people")
+        } else {
+            print("Unable to save data")
+        }
+    }
     
     
     //MARK: - Collection View Delegate / Data Source
@@ -113,6 +137,7 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
                 //Attempt to read textfields text
                 guard let newName = ac?.textFields?[0].text else { return }
                 person.name = newName
+                self?.save()
                 self?.collectionView.reloadData()
             }))
             
