@@ -5,7 +5,7 @@
 //  Created by Sean Williams on 15/10/2019.
 //  Copyright © 2019 Sean Williams. All rights reserved.
 //
-
+import LocalAuthentication
 import UIKit
 
 class ViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
@@ -15,7 +15,76 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewPerson))
+        
+        let notificationCenter = NotificationCenter()
+        notificationCenter.addObserver(self, selector: #selector(save), name: UIApplication.willResignActiveNotification, object: nil)
+        
+        authenticateUser()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        authenticateUser()
+    }
 
+    
+    func authenticateUser() {
+        let context = LAContext()
+        var error: NSError?
+        
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            let reason = "Authentication required to load saved data."
+            
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { [weak self] success, authenticationError in
+                DispatchQueue.main.async {
+                    if success {
+                        self?.loadDataFromUserDefaults()
+                    } else {
+                        // Error
+                        let ac = UIAlertController(title: "FACE ID Failed", message: "You could not be identified.", preferredStyle: .alert)
+                        ac.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
+                            if let password = KeychainWrapper.standard.string(forKey: "Password") {
+                                self?.passwordAuthenticate(password: password)
+                            } else {
+                                self?.passwordAuthenticate(password: nil)
+                            }
+                        }))
+                        self?.present(ac, animated: true)
+                    }
+                }
+            }
+        } else {
+            // No biometry
+            let ac = UIAlertController(title: "Biometry unavailable", message: "Your device is not configured for biometric authentication.", preferredStyle: .alert)
+            ac.addAction(UIAlertAction(title: "OK", style: .default))
+            self.present(ac, animated: true)
+        }
+    }
+    
+    func passwordAuthenticate(password: String?) {
+        let ac = UIAlertController(title: "Enter Password", message: "If you are a new user, please create a password.", preferredStyle: .alert)
+        ac.addTextField()
+        ac.addAction(UIAlertAction(title: "OK", style: .default, handler: { (action) in
+            guard let text = ac.textFields?[0].text else { return }
+            if password == nil {
+                KeychainWrapper.standard.set(text, forKey: "Password")
+                self.loadDataFromUserDefaults()
+                
+            } else if password == text {
+                self.loadDataFromUserDefaults()
+
+            } else {
+                let ac = UIAlertController(title: "User Authentication Failed", message: "You could not be identified.", preferredStyle: .alert)
+                ac.addAction(UIAlertAction(title: "OK", style: .default))
+                self.present(ac, animated: true)
+            }
+        }))
+        
+        present(ac, animated: true)
+    }
+    
+    
+    fileprivate func loadDataFromUserDefaults() {
         //Load saved data from UD
         let defaults = UserDefaults.standard
         
@@ -28,16 +97,14 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
                 print("Could not decode")
             }
         }
+        self.collectionView.reloadData()
     }
-
 
     
     //MARK: - Image Picker Delegate
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let image = info[.editedImage] as? UIImage else { return }
-        
-        
         
         //creates a unique name string for the image name and appends to image
         let imageName = UUID().uuidString
@@ -57,6 +124,8 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         //Dismisses the top-most view controller
         dismiss(animated: true)
     }
+    
+    
     
     // Create image picker
     @objc func addNewPerson() {
@@ -83,7 +152,7 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
     }
 
     
-    func save() {
+    @objc func save() {
         let jsonEncoder = JSONEncoder()
         
         if let savedData = try? jsonEncoder.encode(people) {
